@@ -1,0 +1,8 @@
+opencv-python
+inference
+numpy
+pandas
+streamlit
+pillow
+exifread
+scipy
