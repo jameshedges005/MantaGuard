@@ -30,6 +30,7 @@ if st.button("Analyze Video"):
             st.stop()
 
         # Save uploaded file temporarily
+        os.makedirs("data", exist_ok=True)
         temp_path = "data/temp_video.mp4"
         with open(temp_path, "wb") as f:
             f.write(video_file.getbuffer())
