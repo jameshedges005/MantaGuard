@@ -1,0 +1,118 @@
+MantaGuard is a real-time computer vision pipeline for detecting and classifying vessel manta ray interactions from drone footage. It combines YOLOv8-based object detection with multi-object tracking and behavioural analysis to identify evasion responses in reef manta rays (Mobula alfredi).
+
+Features
+Multi-object tracking: Simultaneous tracking of mantas and vessels from video
+Vessel detection: Identifies two vessel classes (Speedboat, Dhoni-style boat) via Roboflow YOLOv8
+Heading-based evasion detection: Classifies evasion responses using manta heading changes relative to a circular-mean baseline
+Automatic altitude inference: Estimates flight altitude from detected vessel length (optional)
+GSD calculation: Converts pixel distances to metres using drone sensor parameters
+Human validation UI: Interactive confirmation of machine-detected evasions during playback
+Live plotting: Optional real-time distance/heading plots overlaid on video
+Batch processing: Headless mode for automated runs across video libraries
+Requirements
+Python 3.8+
+OpenCV (cv2)
+NumPy, Pandas, Matplotlib
+Roboflow inference package (local model inference)
+
+Quickstart
+
+Download the test video (sample Maldives footage with manta–vessel approach):
+
+bash
+# Download from Google Drive
+wget "https://drive.google.com/uc?id=1dRdtmBpBvz8MxImQYL44RRdLTwxH3yaj&export=download" -O sample_video.mp4
+
+Then run MantaGuard:
+
+bash
+python mantaguard.py sample_video.mp4 --altitude 80.0 --plot --save-plot-data
+
+This will:
+
+Detect and track mantas and vessels
+Generate a distance/heading plot (sample_video_manta1_plot.png)
+Save per-frame tracking data (sample_video_manta1_plotdata.csv)
+Log events to events.csv and evasion_events.csv
+
+
+
+Install dependencies:
+
+bash
+pip install opencv-python numpy pandas matplotlib roboflow
+Quickstart
+
+Basic usage — detect and track a single video:
+
+bash
+python mantaguard.py /path/to/video.mp4 --altitude 80.0 --plot
+
+This runs detection at 30 fps (default), generates a distance/heading plot, and logs events to events.csv.
+
+Common Arguments
+Argument	Type	Default	Description
+video_path	str	—	Path to input video (MP4, MOV, or other format OpenCV can read)
+--altitude	float	80.0	Altitude in metres. Required for GSD calculation.
+--sensor-width	float	6.17	Camera sensor width (mm). Defaults to DJI Mavic Pro Platinum.
+--focal-length	float	24.0	Equivalent focal length (mm).
+--frame-skip	int	1	Process every n-th frame (e.g., 2 = 50% faster, ~15 fps). Detection skipped; last frame reused.
+--boat-length	float	—	Boat length (m). If provided, altitude is inferred from detected boat width. Overrides --altitude.
+--plot	—	False	Save distance/heading plot as PNG alongside video.
+--save-plot-data	—	False	Save per-frame tracking data (frame, distance, heading, speed, etc.) to CSV.
+--no-display	—	False	Suppress video window (headless mode; speeds up batch processing).
+--no-validate	—	False	Skip human validation prompts; all evasions logged as unreviewed.
+--plot-display	—	False	Show live distance/heading plots alongside video during playback (slower).
+--uncertain	float	—	Distance measurement uncertainty as a fraction (e.g., 0.10 for ±10%). Plotted as shaded band.
+--turn-trigger	float	45.0	Heading-change threshold (°) to arm evasion candidate.
+--trigger-window	int	150	Lookback window (frames) for baseline heading.
+--trigger-distance	float	35.0	Maximum vessel distance (m) required to trigger candidate.
+
+Drone Sensor Presets
+
+Adjust --sensor-width and --focal-length for your drone:
+
+DJI Air 2S: --sensor-width 13.2 --focal-length 8.38
+DJI Mavic Pro Platinum (default): --sensor-width 6.17 --focal-length 4.74
+DJI Mavic Air 2: --sensor-width 6.3 --focal-length 4.49
+DJI Mini 2SE: --sensor-width 5.76 --focal-length 4.49
+
+Pipeline Overview
+Detection (per frame or frame-skip): YOLOv8 detects mantas and vessels via Roboflow API
+Tracking: Hungarian-like greedy assignment; tracks persist across 90-frame dropouts
+Heading calculation: Per-track circular-mean baseline over 30-frame window; current heading vs baseline
+Evasion triggering: Candidate armed when (1) heading turn ≥ threshold, (2) vessel ≤ distance gate, (3) vessel closing
+Confirmation: Candidate confirmed if manta sustains >45° heading change for ≥60 of 90 lock frames
+Refractory window: No new candidates for 150 frames after confirmation, or until turn metric drops below threshold
+Logging: Event written to events.csv (raw approach) or evasion_events.csv (confirmed evasion)
+
+Output Files
+events.csv: All manta–vessel approaches (one row per pair), including non-evasion tolerances
+evasion_events.csv: Confirmed and manually flagged evasion events with human validation status
+approaches.csv: Closest approach distance for each manta in the video
+{video_stem}_manta{N}_plot.png: Distance and heading-change plot (if --plot given)
+{video_stem}_manta{N}_plotdata.csv: Per-frame tracking data for further analysis (if --save-plot-data given)
+
+Interactive Controls (Video Playback)
+Y / N / U: Confirm, reject, or mark as uncertain an evasion detection
+S: Skip validation for remainder of video
+Q: Quit playback
+Mouse click on manta bbox: Manually flag as evasion (writes to evasion_events.csv with manually_flagged note)
+
+Batch Processing Example
+bash
+for video in /mnt/videos/*.mp4; do
+  python mantaguard.py "$video" --altitude 85 --frame-skip 2 --no-display --no-validate --save-plot-data
+done
+
+Processes all MP4 files at 50% speed, headless, without validation prompts, saving plot data for each manta.
+
+Model & API
+Detection model: Roboflow manta-detector/3 (YOLOv8 custom-trained on Maldives footage)
+Classes: Speedboat, Boat - Dhoni
+Inference: Local via Roboflow inference package (faster than API calls for frame-by-frame processing)
+Citation
+
+If you use MantaGuard in research, please cite:
+
+James Hedges. MantaGuard: Vessel evasion detection in reef manta rays. [University of Exeter, 2026].
